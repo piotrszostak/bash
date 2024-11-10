@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Setup output directory and file
+OUTPUT_DIR="$HOME"
+DATE=$(date +%Y-%m-%d)
+OUTPUT_FILE="$OUTPUT_DIR/packages_$DATE.txt"
+
+# Function to check if a command exists
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Function to print section headers
+print_header() {
+  echo -e "\n### $1 ###\n" | tee -a "$OUTPUT_FILE"
+}
+
+# Start gathering information
+echo "Gathering package information..."
+echo "Report generated on $(date)" >"$OUTPUT_FILE"
+echo "System: $(uname -a)" >>"$OUTPUT_FILE"
+echo "----------------------------------------" >>"$OUTPUT_FILE"
+
+# Pacman packages
+print_header "PACMAN PACKAGES"
+if command_exists pacman; then
+  pacman -Qe | tee -a "$OUTPUT_FILE"
+  PACMAN_COUNT=$(pacman -Qe | wc -l)
+  echo "Total: $PACMAN_COUNT" | tee -a "$OUTPUT_FILE"
+else
+  echo "Pacman not found" | tee -a "$OUTPUT_FILE"
+fi
+
+# YAY packages
+print_header "AUR PACKAGES (yay)"
+if command_exists yay; then
+  yay -Qma | tee -a "$OUTPUT_FILE"
+  YAY_COUNT=$(yay -Qma | wc -l)
+  echo "Total: $YAY_COUNT" | tee -a "$OUTPUT_FILE"
+else
+  echo "Yay not found" | tee -a "$OUTPUT_FILE"
+fi
+
+# Flatpak packages
+print_header "FLATPAK PACKAGES"
+if command_exists flatpak; then
+  flatpak list --app --columns=name,version | tee -a "$OUTPUT_FILE"
+  FLATPAK_COUNT=$(flatpak list --app | wc -l)
+  echo "Total: $FLATPAK_COUNT" | tee -a "$OUTPUT_FILE"
+else
+  echo "Flatpak not found" | tee -a "$OUTPUT_FILE"
+fi
+
+# Nix packages
+print_header "NIX PACKAGES"
+if command_exists nix; then
+  if [ -d "$HOME/.nix-profile" ]; then
+    nix-env -q | tee -a "$OUTPUT_FILE"
+    NIX_COUNT=$(nix-env -q | wc -l)
+    echo "Total: $NIX_COUNT" | tee -a "$OUTPUT_FILE"
+  else
+    echo "Nix profile not found" | tee -a "$OUTPUT_FILE"
+  fi
+else
+  echo "Nix not found" | tee -a "$OUTPUT_FILE"
+fi
+
+# Summary
+print_header "SUMMARY"
+[ -n "$PACMAN_COUNT" ] && echo "Pacman packages: $PACMAN_COUNT" | tee -a "$OUTPUT_FILE"
+[ -n "$YAY_COUNT" ] && echo "AUR packages: $YAY_COUNT" | tee -a "$OUTPUT_FILE"
+[ -n "$FLATPAK_COUNT" ] && echo "Flatpak packages: $FLATPAK_COUNT" | tee -a "$OUTPUT_FILE"
+[ -n "$NIX_COUNT" ] && echo "Nix packages: $NIX_COUNT" | tee -a "$OUTPUT_FILE"
+
+TOTAL=0
+for count in $PACMAN_COUNT $YAY_COUNT $FLATPAK_COUNT $NIX_COUNT; do
+  if [ -n "$count" ]; then
+    TOTAL=$((TOTAL + count))
+  fi
+done
+
+echo "Total packages: $TOTAL" | tee -a "$OUTPUT_FILE"
+echo "Report saved to: $OUTPUT_FILE"
